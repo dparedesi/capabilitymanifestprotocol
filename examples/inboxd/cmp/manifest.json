@@ -1,0 +1,8 @@
+{
+  "domain": "email",
+  "name": "inboxd",
+  "summary": "Gmail management: triage, delete, restore",
+  "version": "1.0.0",
+  "binary": "inbox",
+  "tags": ["gmail", "notifications", "cleanup", "multi-account"]
+}

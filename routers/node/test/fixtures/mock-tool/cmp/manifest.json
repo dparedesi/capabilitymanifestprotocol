@@ -1,0 +1,6 @@
+{
+  "name": "mock-tool",
+  "domain": "test",
+  "version": "1.0.0",
+  "summary": "A mock tool for testing the CMP router"
+}

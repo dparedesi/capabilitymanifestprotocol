@@ -1,0 +1,135 @@
+{
+  "intents": [
+    {
+      "patterns": [
+        "check email",
+        "unread count",
+        "inbox status",
+        "how many emails",
+        "email summary"
+      ],
+      "command": "inbox summary --json",
+      "returns": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string", "description": "Account name" },
+            "email": { "type": "string", "description": "Email address" },
+            "unread": { "type": "integer", "description": "Unread count" }
+          }
+        }
+      },
+      "confirm": false,
+      "destructive": false,
+      "idempotent": true
+    },
+    {
+      "patterns": [
+        "analyze emails",
+        "get email data",
+        "fetch emails for triage",
+        "list recent emails"
+      ],
+      "command": "inbox analyze --count {count} --json",
+      "params": {
+        "count": {
+          "type": "integer",
+          "default": 20,
+          "description": "Number of emails to analyze"
+        }
+      },
+      "returns": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string" },
+            "from": { "type": "string" },
+            "subject": { "type": "string" },
+            "snippet": { "type": "string" },
+            "date": { "type": "string" },
+            "account": { "type": "string" },
+            "labelIds": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      },
+      "confirm": false,
+      "destructive": false,
+      "idempotent": true
+    },
+    {
+      "patterns": [
+        "delete emails",
+        "trash messages",
+        "remove emails",
+        "clean inbox"
+      ],
+      "command": "inbox delete --ids {ids} --confirm",
+      "params": {
+        "ids": {
+          "type": "array<string>",
+          "required": true,
+          "description": "Email IDs to delete"
+        }
+      },
+      "returns": {
+        "type": "object",
+        "properties": {
+          "deleted": { "type": "integer" },
+          "ids": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "confirm": true,
+      "destructive": true,
+      "idempotent": false
+    },
+    {
+      "patterns": [
+        "restore emails",
+        "undo delete",
+        "recover messages",
+        "undelete"
+      ],
+      "command": "inbox restore --last {count}",
+      "params": {
+        "count": {
+          "type": "integer",
+          "default": 1,
+          "description": "Number of recent deletions to undo"
+        }
+      },
+      "returns": {
+        "type": "object",
+        "properties": {
+          "restored": { "type": "integer" },
+          "ids": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "confirm": false,
+      "destructive": false,
+      "idempotent": false
+    },
+    {
+      "patterns": [
+        "list accounts",
+        "show accounts",
+        "which email accounts"
+      ],
+      "command": "inbox accounts --json",
+      "returns": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "email": { "type": "string" }
+          }
+        }
+      },
+      "confirm": false,
+      "destructive": false,
+      "idempotent": true
+    }
+  ]
+}

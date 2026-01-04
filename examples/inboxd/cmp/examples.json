@@ -1,0 +1,61 @@
+{
+  "examples": [
+    {
+      "intent": "How many unread emails do I have?",
+      "invocation": {
+        "want": "check email"
+      },
+      "result": {
+        "success": true,
+        "output": [
+          { "name": "personal", "email": "me@gmail.com", "unread": 12 },
+          { "name": "work", "email": "me@company.com", "unread": 5 }
+        ]
+      }
+    },
+    {
+      "intent": "Show me my last 10 emails so I can decide what to delete",
+      "invocation": {
+        "want": "analyze emails",
+        "context": { "count": 10 }
+      },
+      "result": {
+        "success": true,
+        "output": [
+          {
+            "id": "18e9abc123",
+            "from": "newsletter@example.com",
+            "subject": "Weekly Digest",
+            "snippet": "This week's top stories...",
+            "date": "2026-01-03",
+            "account": "personal",
+            "labelIds": ["UNREAD", "CATEGORY_PROMOTIONS"]
+          }
+        ]
+      }
+    },
+    {
+      "intent": "Delete emails abc123 and def456",
+      "invocation": {
+        "want": "delete emails",
+        "context": { "ids": ["abc123", "def456"] },
+        "confirm": true
+      },
+      "result": {
+        "success": true,
+        "output": { "deleted": 2, "ids": ["abc123", "def456"] }
+      }
+    },
+    {
+      "intent": "Undo the last 3 deletions",
+      "invocation": {
+        "want": "restore emails",
+        "context": { "count": 3 }
+      },
+      "result": {
+        "success": true,
+        "output": { "restored": 3, "ids": ["abc123", "def456", "ghi789"] }
+      }
+    }
+  ]
+}

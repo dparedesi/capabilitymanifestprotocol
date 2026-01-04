@@ -1,0 +1,91 @@
+{
+  "intents": [
+    {
+      "patterns": ["echo message", "say something", "re:^echo\\s+"],
+      "command": "echo {message}",
+      "params": {
+        "message": {
+          "type": "string",
+          "required": true,
+          "description": "The message to echo"
+        }
+      }
+    },
+    {
+      "patterns": ["greet user", "say hello"],
+      "command": "echo 'Hello, {name}!'",
+      "params": {
+        "name": {
+          "type": "string",
+          "required": false,
+          "default": "World",
+          "description": "Name to greet"
+        }
+      }
+    },
+    {
+      "patterns": ["add numbers", "sum values"],
+      "command": "echo '{\"result\": {a} + {b}}'",
+      "params": {
+        "a": {
+          "type": "integer",
+          "required": true,
+          "description": "First number"
+        },
+        "b": {
+          "type": "integer",
+          "required": true,
+          "description": "Second number"
+        }
+      }
+    },
+    {
+      "patterns": ["delete file", "remove file"],
+      "command": "rm {path}",
+      "confirm": true,
+      "destructive": true,
+      "params": {
+        "path": {
+          "type": "string",
+          "required": true,
+          "description": "File path to delete"
+        }
+      }
+    },
+    {
+      "patterns": ["list files"],
+      "command": "ls -la {directory}",
+      "params": {
+        "directory": {
+          "type": "string",
+          "required": false,
+          "default": ".",
+          "description": "Directory to list"
+        }
+      }
+    },
+    {
+      "patterns": ["select mode", "choose option"],
+      "command": "echo 'Mode: {mode}'",
+      "params": {
+        "mode": {
+          "type": "string",
+          "required": true,
+          "enum": ["debug", "release", "test"],
+          "description": "Build mode"
+        }
+      }
+    },
+    {
+      "patterns": ["process items", "batch process"],
+      "command": "echo 'Processing: {items}'",
+      "params": {
+        "items": {
+          "type": "array<string>",
+          "required": true,
+          "description": "Items to process"
+        }
+      }
+    }
+  ]
+}

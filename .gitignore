@@ -1,0 +1,60 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+*.tgz
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+*.pem
+credentials.json
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+
+# OS files
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# CMP runtime (user-specific)
+.cmp/
+
+# Context files (session handoffs)
+.context/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Go
+bin/

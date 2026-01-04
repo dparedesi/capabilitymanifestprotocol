@@ -1,0 +1,58 @@
+{
+  "name": "cmp-router",
+  "version": "0.1.0",
+  "description": "Capability Manifest Protocol router for AI-tool integration",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./server": "./src/server.js",
+    "./socket": "./src/socket-server.js",
+    "./stdio": "./src/stdio-server.js",
+    "./config": "./src/config.js",
+    "./validator": "./src/validator.js",
+    "./executor": "./src/executor.js"
+  },
+  "bin": {
+    "cmp": "./src/cli.js"
+  },
+  "files": [
+    "src/",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "start": "node src/cli.js serve",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "keywords": [
+    "cmp",
+    "capability",
+    "manifest",
+    "protocol",
+    "ai",
+    "agent",
+    "tools",
+    "mcp-alternative"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "author": "Daniel Paredes",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dparedesi/capabilitymanifestprotocol",
+    "directory": "routers/node"
+  },
+  "bugs": {
+    "url": "https://github.com/dparedesi/capabilitymanifestprotocol/issues"
+  },
+  "homepage": "https://github.com/dparedesi/capabilitymanifestprotocol/tree/main/routers/node#readme",
+  "devDependencies": {
+    "vitest": "^2.0.0"
+  }
+}

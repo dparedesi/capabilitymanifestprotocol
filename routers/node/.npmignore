@@ -1,0 +1,23 @@
+# Exclude test files and directories
+test/
+*.test.js
+
+# Exclude development files
+.github/
+vitest.config.js
+.npmignore
+
+# Exclude editor/IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Exclude OS files
+.DS_Store
+Thumbs.db
+
+# Exclude coverage output
+coverage/
+.nyc_output/
