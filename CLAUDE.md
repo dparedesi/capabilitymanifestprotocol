@@ -2,24 +2,87 @@
 
 ## Project Overview
 
-The Capability Manifest Protocol (CMP) — an intent-based protocol for AI tool integration that provides O(1) context overhead.
+The Capability Manifest Protocol (CMP) - a file format and convention for AI agents to discover and use CLI tools with O(1) context overhead.
+
+## What CMP Is
+
+CMP is NOT a protocol or middleware. It's:
+1. **A manifest format** - Two JSON files that describe a tool
+2. **A location convention** - Tools live in `~/.cmp/tools/`
+3. **An agent instruction** - ~80 tokens that teach AI where to look
+
+AI agents read the files directly. No router required.
 
 ## Repository Structure
 
 ```
 capabilitymanifestprotocol/
-├── README.md              # Protocol overview
-├── SPEC.md                # Full specification
+├── README.md              # Main documentation
+├── SPEC.md                # Full specification (v0.2.0)
+├── AGENT_SETUP.md         # Agent integration guide
+├── ANNOUNCEMENT.md        # Blog post / announcement
 ├── CLAUDE.md              # This file
 ├── examples/
 │   └── inboxd/            # Example CMP-compatible tool
 └── routers/
-    ├── node/              # Reference implementation (npm: cmp-router)
-    ├── python/            # Planned
-    └── go/                # Planned
+    └── node/              # Optional validator/dev tool
 ```
 
-## Node.js Router (Reference Implementation)
+## Key Files
+
+| File | Purpose |
+|------|---------|
+| `SPEC.md` | Manifest and capability schemas, discovery convention |
+| `AGENT_SETUP.md` | The ~80 token snippet users add to their AI instructions |
+| `README.md` | Overview and getting started |
+| `examples/inboxd/` | Reference example showing file structure |
+
+## The CMP Format
+
+### manifest.json
+
+```json
+{
+  "domain": "email",
+  "name": "inboxd",
+  "summary": "Gmail management: triage, delete, restore",
+  "version": "1.0.0"
+}
+```
+
+### capability.json
+
+```json
+{
+  "intents": [
+    {
+      "patterns": ["check email", "unread count"],
+      "command": "inbox summary --json"
+    }
+  ]
+}
+```
+
+### Location Convention
+
+```
+~/.cmp/tools/
+  inboxd/
+    cmp/
+      manifest.json
+      capability.json
+  another-tool/
+    cmp/
+      manifest.json
+      capability.json
+```
+
+## Optional Router (routers/node/)
+
+The Node.js router is now an optional development tool for:
+- Validating manifest/capability files
+- Testing intent matching
+- Legacy JSON-RPC integrations
 
 ### Quick Reference
 
@@ -32,89 +95,44 @@ npm test
 # Run tests in watch mode
 npm run test:watch
 
-# Start the router
-npm start
-
-# Start with options
-node src/cli.js start --socket --hot-reload
+# Validate a tool
+node src/cli.js validate /path/to/tool
 ```
 
-### Architecture
+### Router Architecture
 
 ```
 routers/node/src/
-├── index.js           # Router class - orchestrates all components
-├── registry.js        # Tool discovery, registration, hot reload
-├── matcher.js         # Intent pattern matching (exact, regex, word overlap)
-├── executor.js        # Command building and execution with timeouts
-├── validator.js       # Parameter validation, type coercion, shell escaping
-├── server.js          # HTTP JSON-RPC server (exports handleRequest)
-├── socket-server.js   # Unix socket server
-├── stdio-server.js    # Stdio server for embedded use
-├── config.js          # Configuration loading from file/env
-└── cli.js             # Command line interface
+├── index.js           # Router class
+├── registry.js        # Tool discovery
+├── matcher.js         # Intent pattern matching
+├── executor.js        # Command execution
+├── validator.js       # Parameter validation
+└── cli.js             # CLI interface
 ```
-
-### Key Design Decisions
-
-1. **Shell escaping**: Uses single-quote wrapping with `'\''` for embedded quotes
-2. **Timeout**: Default 30s, enforced via `setTimeout` + process kill
-3. **Hot reload**: Uses `fs.watch` with 100ms debounce
-4. **handleRequest sharing**: All servers import from `server.js`
-
-### Testing
-
-Tests use vitest. 136 tests across 6 files:
-
-- `test/unit/validator.test.js` — Parameter validation
-- `test/unit/matcher.test.js` — Intent pattern matching
-- `test/unit/executor.test.js` — Command execution
-- `test/unit/registry.test.js` — Tool discovery
-- `test/integration/router.test.js` — Full intent flow
-- `test/integration/server.test.js` — HTTP JSON-RPC
-
-Mock tool fixture: `test/fixtures/mock-tool/`
-
-## JSON-RPC Methods
-
-| Method | Required Params |
-|--------|-----------------|
-| `cmp.ping` | — |
-| `cmp.domains` | — |
-| `cmp.manifests` | `domain?` |
-| `cmp.capabilities` | `tool` |
-| `cmp.schema` | `tool`, `pattern` |
-| `cmp.intent` | `want`, `context?`, `confirm?` |
-| `cmp.context` | — |
-
-## Error Codes
-
-| Code | Meaning |
-|------|---------|
-| `-32602` | Invalid/missing params |
-| `-32000` | Intent not matched |
-| `-32001` | Tool not found |
-| `-32002` | Confirmation required |
-| `-32003` | Execution failed |
-| `-32004` | Ambiguous intent |
 
 ## Common Tasks
 
-### Adding a new JSON-RPC method
+### Adding a new example tool
 
-1. Add handler in `src/server.js` `handleRequest` function
-2. Add corresponding method to `Router` class in `src/index.js`
-3. Add tests in `test/integration/server.test.js`
+1. Create directory in `examples/<tool-name>/`
+2. Add `cmp/manifest.json` with domain, name, summary, version
+3. Add `cmp/capability.json` with intents array
+4. Add README.md explaining the tool
 
-### Modifying parameter validation
+### Updating the specification
 
-1. Update `src/validator.js`
-2. Add tests in `test/unit/validator.test.js`
+1. Edit `SPEC.md`
+2. Update version number if breaking change
+3. Update `README.md` if user-facing changes
+4. Update `AGENT_SETUP.md` if snippet changes
 
-### Adding CLI commands
+### Testing manifest validation
 
-1. Update `src/cli.js` switch statement
-2. Update `showHelp()` function
+```bash
+cd routers/node
+npm test -- --grep "validator"
+```
 
 ## Files to Never Commit
 

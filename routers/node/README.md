@@ -1,178 +1,107 @@
-# CMP Router
+# CMP Router (Optional Development Tool)
 
 [![npm version](https://img.shields.io/npm/v/cmp-router.svg)](https://www.npmjs.com/package/cmp-router)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-The reference implementation of the [Capability Manifest Protocol (CMP)](../../SPEC.md) router — a lightweight, intent-based protocol for AI tool integration.
+> **Note**: As of CMP v0.2.0, the router is optional. AI agents can discover and use CMP tools by reading files directly. This router is useful for validation, testing, and development workflows.
 
-## What is CMP?
+## When to Use This
 
-CMP solves the "tool explosion" problem for AI agents. Instead of loading every tool's schema into context, agents get a minimal snippet and query tools on-demand:
+- **Validating manifests** during tool development
+- **Testing intent matching** before deploying a tool
+- **Debugging** capability.json patterns
+- **Legacy integrations** that need JSON-RPC interface
 
-```
-Traditional: Load 50 tool schemas → 10,000+ tokens
-CMP: Load context snippet → ~100 tokens, query as needed
-```
-
-**Key benefits:**
-- **O(1) context overhead** — Token cost doesn't scale with tool count
-- **Intent-based** — Express goals, not syntax ("check email" vs `inbox --summary --json`)
-- **Security-first** — Parameter validation, shell escaping, confirmation for destructive actions
-- **Multiple transports** — HTTP, Unix socket, or stdio
+For most use cases, you don't need the router. See the main [README](../../README.md) for the file-based approach.
 
 ## Installation
 
 ```bash
-# Install globally
 npm install -g cmp-router
-
-# Or locally
-npm install cmp-router
 ```
 
 ## Quick Start
 
 ```bash
-# Initialize config directory
-cmp init
+# Validate a tool's CMP files
+cmp validate ~/.cmp/tools/mytool
 
-# Register a tool
-cmp register /path/to/my-tool
-
-# Start the router
-cmp start
-
-# Execute an intent
+# Test intent matching
 cmp intent "check my email"
+
+# List discovered tools
+cmp tools
 ```
 
 ## CLI Reference
 
 ```bash
-cmp start [options]       # Start the router server
-cmp domains               # List available domains
+cmp validate <path>       # Validate manifest and capability files
 cmp tools [domain]        # List registered tools
-cmp register <path>       # Register a tool directory
-cmp intent <text>         # Execute a natural language intent
-cmp context               # Show context snippet for AI agents
-cmp init                  # Initialize CMP config directory
+cmp intent <text>         # Test intent matching
+cmp start [options]       # Start router server (for legacy use)
 ```
 
-### Server Options
+### Validation
 
 ```bash
-cmp start                          # HTTP on port 7890 (default)
-cmp start -p 8080                  # HTTP on custom port
-cmp start --socket                 # Unix socket mode
-cmp start --stdio                  # Stdio mode (for embedded use)
-cmp start --hot-reload             # Watch for tool changes
-cmp start --socket-path /tmp/cmp.sock  # Custom socket path
+# Validate a single tool
+cmp validate ~/.cmp/tools/inboxd
+# ✓ manifest.json is valid
+# ✓ capability.json is valid
+# ✓ 5 intents defined
+# ✓ All patterns have at least one test match
+
+# Validate all tools
+cmp validate ~/.cmp/tools/*
 ```
 
-## API Reference
+### Intent Testing
 
-The router exposes a JSON-RPC 2.0 API. See [docs/integration.md](docs/integration.md) for complete documentation.
+```bash
+# Test if an intent matches
+cmp intent "delete my emails"
+# Match: inboxd
+# Pattern: "delete emails"
+# Command: inbox delete --ids {ids} --confirm
+# Confirm: true, Destructive: true
+```
 
-### Methods
+## Tool Discovery
+
+The router scans these locations for CMP tools:
+
+1. `~/.cmp/tools/` (primary)
+2. `/usr/local/share/cmp/tools/`
+3. `CMP_TOOL_PATH` environment variable
+
+Each tool must have:
+
+```
+my-tool/
+└── cmp/
+    ├── manifest.json      # Tool identity
+    └── capability.json    # Intent patterns
+```
+
+## Server Mode (Legacy)
+
+For integrations that need JSON-RPC, the router can run as a server:
+
+```bash
+cmp start                 # HTTP on port 7890
+cmp start --socket        # Unix socket
+cmp start --stdio         # Stdio mode
+```
+
+### JSON-RPC Methods
 
 | Method | Description |
 |--------|-------------|
 | `cmp.ping` | Health check |
 | `cmp.domains` | List available domains |
 | `cmp.manifests` | Get tool manifests |
-| `cmp.capabilities` | Get tool capabilities |
-| `cmp.schema` | Get intent parameter schema |
-| `cmp.intent` | Execute a natural language intent |
-| `cmp.context` | Get context snippet for AI agents |
-
-### Example
-
-```bash
-# List domains
-curl -X POST http://localhost:7890 \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"cmp.domains","id":1}'
-
-# Execute an intent
-curl -X POST http://localhost:7890 \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"cmp.intent","params":{"want":"check email"},"id":2}'
-```
-
-## Architecture
-
-```
-src/
-├── index.js           # Router class - main entry point
-├── registry.js        # Tool discovery and registration (with hot reload)
-├── matcher.js         # Intent pattern matching
-├── executor.js        # Command building and execution (with validation)
-├── validator.js       # Parameter validation and shell escaping
-├── server.js          # HTTP JSON-RPC server
-├── socket-server.js   # Unix socket server
-├── stdio-server.js    # Stdio server for embedded use
-├── config.js          # Configuration loading
-└── cli.js             # Command line interface
-```
-
-## Tool Registration
-
-Tools are discovered from:
-
-1. `~/.cmp/tools/` — User tools
-2. `/usr/local/share/cmp/tools/` — System tools
-3. `CMP_TOOL_PATH` environment variable
-4. Explicitly registered paths via `cmp register`
-
-Each tool directory must contain:
-
-```
-my-tool/
-└── cmp/
-    ├── manifest.json      # Tool identity (domain, name, summary)
-    └── capability.json    # Intent patterns and commands
-```
-
-See the [CMP Specification](../../SPEC.md) for manifest and capability formats.
-
-## Configuration
-
-CMP Router loads configuration from multiple sources (highest to lowest priority):
-
-1. **Environment variables**
-2. **Config file** (`~/.cmp/config.json`)
-3. **Default values**
-
-### Config File
-
-```json
-{
-  "timeout": 30000,
-  "httpPort": 7890,
-  "httpHost": "127.0.0.1",
-  "socketPath": "~/.cmp/router.sock",
-  "searchPaths": ["/path/to/tools"],
-  "enableLogging": false
-}
-```
-
-### Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `CMP_TIMEOUT` | Command timeout (ms) | `30000` |
-| `CMP_HTTP_PORT` | HTTP server port | `7890` |
-| `CMP_SOCKET_PATH` | Unix socket path | `~/.cmp/router.sock` |
-| `CMP_TOOL_PATH` | Colon-separated tool paths | — |
-| `CMP_ENABLE_LOGGING` | Enable execution logging | `false` |
-
-## Security
-
-- **Parameter validation** — Type checking, required params, enum validation
-- **Shell escaping** — Prevents command injection attacks
-- **Confirmation flow** — Destructive actions require explicit confirmation
-- **Timeout enforcement** — Commands timeout after 30s (configurable)
-- **Allow/deny lists** — Restrict which tools can be executed
+| `cmp.intent` | Execute an intent |
 
 ## Programmatic Usage
 
@@ -181,54 +110,43 @@ import { Router } from 'cmp-router';
 
 const router = await new Router().init();
 
-// Get domains
-const { domains } = router.domains();
+// Validate a tool
+const errors = await router.validate('/path/to/tool');
 
-// Execute an intent
-const result = await router.intent({
-  want: 'check email',
-  confirm: false
-});
+// Test intent matching
+const match = router.match('check email');
+console.log(match.tool, match.pattern, match.command);
 ```
-
-## Integration
-
-For AI tool authors, see [docs/integration.md](docs/integration.md) for:
-
-- Protocol reference with examples
-- Detection patterns
-- Minimal and full integration patterns
-- Code examples (Node.js, Python, Shell)
 
 ## Development
 
 ```bash
-# Install dependencies
 npm install
-
-# Run tests
 npm test
-
-# Run tests in watch mode
 npm run test:watch
-
-# Run with coverage
-npm run test:coverage
 ```
 
-## Contributing
+## Architecture
 
-1. Fork the repository
-2. Create a feature branch
-3. Write tests for new functionality
-4. Ensure all tests pass
-5. Submit a pull request
+```
+src/
+├── index.js           # Router class
+├── registry.js        # Tool discovery
+├── matcher.js         # Intent matching
+├── executor.js        # Command execution
+├── validator.js       # Parameter validation
+├── server.js          # HTTP JSON-RPC
+├── socket-server.js   # Unix socket
+├── stdio-server.js    # Stdio
+└── cli.js             # CLI interface
+```
 
 ## License
 
-MIT — see [LICENSE](LICENSE)
+MIT
 
 ## Related
 
-- [CMP Specification](../../SPEC.md) — Protocol specification
-- [inboxd](../../examples/inboxd/) — Example CMP-compatible tool
+- [CMP Specification](../../SPEC.md)
+- [Example Tool: inboxd](../../examples/inboxd/)
+- [Agent Setup Guide](../../AGENT_SETUP.md)

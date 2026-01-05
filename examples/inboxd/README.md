@@ -8,13 +8,27 @@ This directory shows how an existing CLI tool (`inboxd`) can be made CMP-compati
 inboxd/
 └── cmp/
     ├── manifest.json      # Tool identity (< 50 tokens)
-    ├── capability.json    # Intent → command mappings
+    ├── capability.json    # Intent to command mappings
     └── examples.json      # Usage examples for LLM context
+```
+
+## Installation
+
+To install this tool for AI discovery:
+
+```bash
+cp -r examples/inboxd ~/.cmp/tools/
+```
+
+Or create a symlink:
+
+```bash
+ln -s $(pwd)/examples/inboxd ~/.cmp/tools/inboxd
 ```
 
 ## Manifest
 
-The manifest is minimal—just enough for the router to know this tool exists:
+The manifest is minimal - just enough for the AI to know this tool exists:
 
 ```json
 {
@@ -38,28 +52,47 @@ The capability file maps natural language patterns to CLI commands:
 | "delete emails" | `inbox delete --ids {ids} --confirm` |
 | "restore emails" | `inbox restore --last {count}` |
 
-## How the Router Uses This
+## How AI Uses This
 
-1. **Discovery**: Router scans and finds `cmp/manifest.json`
-2. **Registration**: Adds `inboxd` to the `email` domain
-3. **Intent matching**: When AI says "delete these emails", router matches to `delete emails` pattern
-4. **Schema resolution**: Router loads `capability.json` to get parameter requirements
-5. **Invocation**: Router constructs `inbox delete --ids 'abc,def' --confirm`
-6. **Response**: Tool outputs JSON, router returns to AI
+When a user asks about email, the AI:
+
+1. **Lists tools**: `ls ~/.cmp/tools/` shows `inboxd`
+2. **Reads manifest**: `~/.cmp/tools/inboxd/cmp/manifest.json` shows domain is "email"
+3. **Reads capability**: `~/.cmp/tools/inboxd/cmp/capability.json` shows available intents
+4. **Matches intent**: User's request matches a pattern
+5. **Executes command**: AI runs the command with substituted parameters
+
+### Example Flow
+
+```
+User: "How many unread emails do I have?"
+
+AI reads: ~/.cmp/tools/inboxd/cmp/manifest.json
+   → {"domain": "email", "summary": "Gmail management..."}
+   → This matches!
+
+AI reads: ~/.cmp/tools/inboxd/cmp/capability.json
+   → Finds pattern "unread count" → command "inbox summary --json"
+
+AI runs: inbox summary --json
+   → [{"name": "Personal", "email": "user@gmail.com", "unread": 5}]
+
+AI responds: "You have 5 unread emails in your Personal account."
+```
 
 ## Context Efficiency
 
 With MCP, the full schema would be in context: **~500 tokens**.
 
 With CMP:
-- In context: domain list + router reference: **~30 tokens**
-- Loaded on-demand when needed: capability.json
+- In context: Discovery instruction: **~80 tokens** (shared across all tools)
+- Loaded on-demand: manifest (~30 tokens) + capability (~200 tokens)
 
-**Savings: 94% context reduction** for this tool alone.
+**Key difference**: On-demand loading happens in the conversation (ephemeral), not the system prompt (persistent).
 
-## Adding to Your Tool
+## Adding CMP to Your Tool
 
 1. Create `cmp/manifest.json` with your tool's identity
-2. Create `cmp/capability.json` with intent→command mappings
+2. Create `cmp/capability.json` with intent to command mappings
 3. Ensure your CLI has a `--json` flag for structured output
-4. Register with the CMP router: `cmp register .`
+4. Install to `~/.cmp/tools/<your-tool>/`

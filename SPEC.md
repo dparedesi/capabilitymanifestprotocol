@@ -1,4 +1,4 @@
-# CMP Specification v0.1.0
+# CMP Specification v0.2.0
 
 This document defines the Capability Manifest Protocol (CMP) specification.
 
@@ -9,7 +9,6 @@ This document defines the Capability Manifest Protocol (CMP) specification.
 - **Domain**: A category of related tools (e.g., "email", "git", "files")
 - **Manifest**: A minimal description of a tool's identity and purpose
 - **Intent**: A natural language expression of what the caller wants to accomplish
-- **Router**: The intermediary that translates intents to tool invocations
 - **Facet**: An interface mode optimized for a specific consumer type (human/agent)
 
 ## 2. Design Goals
@@ -19,6 +18,7 @@ This document defines the Capability Manifest Protocol (CMP) specification.
 3. **Intent-based invocation**: Callers express goals, not syntax
 4. **Dual-audience**: Same tools work for humans and AI
 5. **Existing tool compatibility**: Adapters, not rewrites
+6. **No middleware required**: AI agents read manifests directly
 
 ## 3. Manifest Format
 
@@ -56,11 +56,10 @@ interface Manifest {
 
 ### 3.3 Manifest Location
 
-Manifests MUST be located at one of:
+Manifests MUST be located at:
 
-1. `<package>/cmp/manifest.json` (preferred)
-2. `<package>/.cmp/manifest.json`
-3. Embedded in package.json under `"cmp"` key
+1. `<tool>/cmp/manifest.json` (preferred)
+2. `<tool>/.cmp/manifest.json`
 
 ### 3.4 Token Budget
 
@@ -173,18 +172,15 @@ interface ParamDef {
 
 Capabilities MUST be located at:
 
-1. `<package>/cmp/capability.json` (preferred)
-2. `<package>/.cmp/capability.json`
+1. `<tool>/cmp/capability.json` (preferred)
+2. `<tool>/.cmp/capability.json`
 
 ### 4.4 Pattern Matching
 
-Patterns are matched using:
+AI agents match user intent to patterns using natural language understanding. Patterns serve as hints and examples, not exhaustive lists.
 
-1. Exact substring match (case-insensitive)
-2. Semantic similarity (if router supports embeddings)
-3. Regex patterns (prefixed with `re:`)
+For tools that want explicit control, regex patterns are supported (prefixed with `re:`):
 
-Example with regex:
 ```json
 {
   "patterns": [
@@ -194,211 +190,79 @@ Example with regex:
 }
 ```
 
-## 5. Router Protocol
+## 5. Discovery Convention
 
-The router is the central component that translates intents to tool invocations.
+CMP tools are discovered by AI agents through a standard file system convention.
 
-### 5.1 Transport
+### 5.1 Canonical Location
 
-Routers MUST support at least one of:
+Tools MUST be installed to:
 
-1. **Unix socket**: `/var/run/cmp.sock` or `~/.cmp/router.sock`
-2. **HTTP**: `http://localhost:7890`
-3. **Stdio**: For embedded routers
-
-Messages are JSON-RPC 2.0.
-
-### 5.2 Methods
-
-#### 5.2.1 `cmp.domains`
-
-List available domains.
-
-```json
-// Request
-{
-  "jsonrpc": "2.0",
-  "method": "cmp.domains",
-  "id": 1
-}
-
-// Response
-{
-  "jsonrpc": "2.0",
-  "result": {
-    "domains": ["email", "git", "files", "web"]
-  },
-  "id": 1
-}
+```
+~/.cmp/tools/<tool-name>/
 ```
 
-#### 5.2.2 `cmp.manifests`
-
-Get manifests for a domain (or all domains).
-
-```json
-// Request
-{
-  "jsonrpc": "2.0",
-  "method": "cmp.manifests",
-  "params": { "domain": "email" },
-  "id": 2
-}
-
-// Response
-{
-  "jsonrpc": "2.0",
-  "result": {
-    "manifests": [
-      {
-        "domain": "email",
-        "name": "inboxd",
-        "summary": "Gmail management: triage, delete, restore",
-        "version": "1.0.0"
-      }
-    ]
-  },
-  "id": 2
-}
+Example:
+```
+~/.cmp/tools/
+  inboxd/
+    cmp/
+      manifest.json
+      capability.json
+    bin/
+      inbox
+  git-helper/
+    cmp/
+      manifest.json
+      capability.json
 ```
 
-#### 5.2.3 `cmp.capabilities`
+### 5.2 Agent Discovery Flow
 
-Get capabilities for a specific tool.
+AI agents discover and use CMP tools by:
 
-```json
-// Request
-{
-  "jsonrpc": "2.0",
-  "method": "cmp.capabilities",
-  "params": { "tool": "inboxd" },
-  "id": 3
-}
+1. **List tools**: `ls ~/.cmp/tools/`
+2. **Read manifest**: `~/.cmp/tools/<name>/cmp/manifest.json`
+3. **Match domain**: Compare user intent to manifest domain/summary
+4. **Read capability**: `~/.cmp/tools/<name>/cmp/capability.json`
+5. **Match intent**: Find matching pattern in capability
+6. **Execute command**: Run the command with substituted parameters
 
-// Response
-{
-  "jsonrpc": "2.0",
-  "result": {
-    "intents": [
-      {
-        "patterns": ["check email", "unread count"],
-        "confirm": false,
-        "destructive": false
-      },
-      {
-        "patterns": ["delete emails", "trash messages"],
-        "confirm": true,
-        "destructive": true
-      }
-    ]
-  },
-  "id": 3
-}
+### 5.3 Agent Context Snippet
+
+AI agents need minimal context to use CMP. Add to agent instructions:
+
+```
+## Local Tools (CMP)
+
+CMP-compatible tools are installed in ~/.cmp/tools/. Each tool has:
+- cmp/manifest.json: domain, name, summary
+- cmp/capability.json: intents, parameters, commands
+
+When a task might benefit from a local tool:
+1. List ~/.cmp/tools/ to see available tools
+2. Read manifest.json files to find relevant domain
+3. Read capability.json to understand invocation
+4. Execute the command directly with substituted parameters
+
+Handle confirm:true intents by asking user permission before executing.
+Handle destructive:true intents with extra caution.
 ```
 
-#### 5.2.4 `cmp.intent`
+This snippet is **< 100 tokens** regardless of how many tools are installed.
 
-Execute an intent.
+### 5.4 Progressive Disclosure
 
-```json
-// Request
-{
-  "jsonrpc": "2.0",
-  "method": "cmp.intent",
-  "params": {
-    "want": "delete these emails",
-    "context": {
-      "ids": ["abc123", "def456"]
-    },
-    "confirm": true
-  },
-  "id": 4
-}
+The discovery convention provides progressive disclosure:
 
-// Response (success)
-{
-  "jsonrpc": "2.0",
-  "result": {
-    "success": true,
-    "tool": "inboxd",
-    "command": "inbox delete --ids 'abc123,def456' --confirm",
-    "output": {
-      "deleted": 2,
-      "ids": ["abc123", "def456"]
-    }
-  },
-  "id": 4
-}
-
-// Response (needs confirmation)
-{
-  "jsonrpc": "2.0",
-  "result": {
-    "success": false,
-    "reason": "confirmation_required",
-    "tool": "inboxd",
-    "command": "inbox delete --ids 'abc123,def456' --confirm",
-    "message": "This will delete 2 emails. Set confirm: true to proceed."
-  },
-  "id": 4
-}
+```
+Level 0: Tool list         ls ~/.cmp/tools/              (first query)
+Level 1: Manifests         manifest.json per tool        (on domain match)
+Level 2: Capabilities      capability.json               (on tool selection)
+Level 3: Execution         Run command                   (on intent match)
 ```
 
-#### 5.2.5 `cmp.schema`
-
-Get full schema for a specific intent (Level 3 disclosure).
-
-```json
-// Request
-{
-  "jsonrpc": "2.0",
-  "method": "cmp.schema",
-  "params": {
-    "tool": "inboxd",
-    "pattern": "delete emails"
-  },
-  "id": 5
-}
-
-// Response
-{
-  "jsonrpc": "2.0",
-  "result": {
-    "patterns": ["delete emails", "trash messages", "remove emails"],
-    "command": "inbox delete --ids {ids} --confirm",
-    "params": {
-      "ids": {
-        "type": "array<string>",
-        "required": true,
-        "description": "Email IDs to delete"
-      }
-    },
-    "returns": {
-      "type": "object",
-      "properties": {
-        "deleted": { "type": "integer" },
-        "ids": { "type": "array", "items": { "type": "string" } }
-      }
-    },
-    "confirm": true,
-    "destructive": true
-  },
-  "id": 5
-}
-```
-
-### 5.3 Error Codes
-
-| Code | Meaning |
-|------|---------|
-| -32600 | Invalid request |
-| -32601 | Method not found |
-| -32602 | Invalid params |
-| -32000 | Intent not matched |
-| -32001 | Tool not found |
-| -32002 | Confirmation required |
-| -32003 | Execution failed |
-| -32004 | Ambiguous intent (multiple matches) |
+Each level loads only when needed, keeping context overhead minimal.
 
 ## 6. Faceted Execution
 
@@ -445,31 +309,22 @@ async function main() {
 }
 ```
 
-## 7. Tool Registration
+## 7. Adapter Layer
 
-Tools register with the router on installation.
+For existing CLIs without native CMP support, create an adapter.
 
-### 7.1 Registration Methods
+### 7.1 Adapter Definition
 
-1. **Directory scanning**: Router scans known paths for `cmp/manifest.json`
-2. **Explicit registration**: `cmp register <path>`
-3. **Package hooks**: npm postinstall registers the tool
+An adapter wraps an existing CLI with CMP metadata:
 
-### 7.2 Search Paths
+```
+~/.cmp/tools/ripgrep-adapter/
+  cmp/
+    manifest.json
+    capability.json
+```
 
-The router scans:
-
-1. `~/.cmp/tools/`
-2. `/usr/local/share/cmp/tools/`
-3. Directories in `CMP_TOOL_PATH`
-4. Node.js global modules with `cmp` in package.json
-
-## 8. Adapter Layer
-
-For existing CLIs without native CMP support.
-
-### 8.1 Adapter Definition
-
+manifest.json:
 ```json
 {
   "adapter": true,
@@ -477,101 +332,109 @@ For existing CLIs without native CMP support.
   "domain": "files",
   "name": "ripgrep",
   "summary": "Fast file content search",
-  "discovery": {
-    "help": "rg --help",
-    "version": "rg --version"
-  },
+  "version": "1.0.0"
+}
+```
+
+capability.json:
+```json
+{
   "intents": [
     {
       "patterns": ["search for", "find in files", "grep"],
-      "template": "rg --json \"{query}\" {path}",
+      "command": "rg --json \"{query}\" {path}",
       "params": {
         "query": { "type": "string", "required": true },
         "path": { "type": "string", "default": "." }
-      },
-      "outputParser": "jsonLines"
+      }
     }
   ]
 }
 ```
 
-### 8.2 Output Parsers
+### 7.2 Adapter vs Native
 
-Built-in parsers for common output formats:
+- **Native CMP tool**: Includes cmp/ directory, may have faceted output
+- **Adapter**: Wraps existing CLI, provides CMP metadata only
 
-- `json`: Single JSON object
-- `jsonLines`: Newline-delimited JSON
-- `table`: Tabular text (parsed heuristically)
-- `lines`: Line-per-result
-- `custom`: User-defined regex
+Both are discovered the same way. The `adapter: true` flag indicates the tool binary is external.
 
-## 9. Security Considerations
+## 8. Security Considerations
 
-### 9.1 Confirmation
+### 8.1 Confirmation
 
-Intents marked `confirm: true` MUST NOT execute without explicit confirmation.
+Intents marked `confirm: true` indicate destructive or sensitive operations.
 
-The router returns `confirmation_required` error. The caller must resend with `confirm: true`.
+AI agents SHOULD:
+1. Display the intended action to the user
+2. Request explicit confirmation before executing
+3. Never auto-confirm destructive operations
 
-### 9.2 Destructive Operations
+### 8.2 Destructive Operations
 
-Intents marked `destructive: true` SHOULD:
+Intents marked `destructive: true` indicate operations that cannot be undone.
 
-1. Require confirmation
-2. Log the operation
-3. Provide undo information if possible
+AI agents SHOULD:
+1. Require confirmation (treat as confirm: true)
+2. Warn the user about irreversibility
+3. Suggest creating backups when appropriate
 
-### 9.3 Sandboxing
+### 8.3 Parameter Validation
 
-The router MAY enforce:
+AI agents SHOULD validate parameters before execution:
+- Required parameters are present
+- Types match the schema
+- Values are within allowed ranges (if enum specified)
 
-- Allow-lists of permitted tools
-- Rate limiting
-- Capability restrictions per caller
+## 9. File Structure Reference
 
-## 10. Context Injection
-
-For AI agents, the router provides a minimal context snippet:
-
-```
-You have access to a Capability Router at cmp://localhost.
-Available domains: email, git, files, web
-
-To use tools, send intents like:
-{ "want": "check email" }
-{ "want": "delete these emails", "context": { "ids": [...] } }
-
-Query cmp.manifests for tool details. Query cmp.schema for parameters.
-```
-
-This snippet is **< 100 tokens** regardless of how many tools are registered.
-
-## 11. Versioning
-
-- Manifests use semver
-- Protocol version in all responses: `"cmp": "0.1.0"`
-- Routers MUST support older manifest versions
-- Breaking changes increment major version
-
-## 12. File Structure Reference
+### 9.1 Tool Structure
 
 ```
-mytool/
-├── src/                       # Implementation
-├── bin/
-│   └── cli.js                 # Entry point
+~/.cmp/tools/mytool/
 ├── cmp/
 │   ├── manifest.json          # Required: tool identity
 │   ├── capability.json        # Required: intent mappings
 │   └── examples.json          # Optional: usage examples
-├── package.json
-└── README.md
+├── bin/
+│   └── mytool                  # The executable (or in PATH)
+└── README.md                   # Optional: human documentation
 ```
+
+### 9.2 Minimal Tool
+
+A minimal CMP tool requires only two files:
+
+```
+~/.cmp/tools/hello/
+└── cmp/
+    ├── manifest.json
+    └── capability.json
+```
+
+If the binary is already in PATH, no additional files are needed.
+
+## 10. Versioning
+
+- Manifests use semver
+- Spec version: `0.2.0`
+- Breaking changes increment major version
+- Tools SHOULD specify minimum spec version if using newer features
 
 ## Appendix A: Full Manifest + Capability Example
 
 See `examples/inboxd/` in this repository.
 
-## Appendix B: Reference Router Implementation
+## Appendix B: Migration from v0.1.0
 
-See `routers/node/` in this repository.
+v0.1.0 defined a router-based protocol with JSON-RPC methods. v0.2.0 simplifies to a file-based convention.
+
+**What changed:**
+- Removed: Router protocol, JSON-RPC methods, socket/HTTP transport
+- Added: `~/.cmp/tools/` canonical location, agent discovery flow
+- Simplified: AI agents read files directly instead of querying a router
+
+**Migration steps:**
+1. Move tools to `~/.cmp/tools/<name>/`
+2. Add agent context snippet to AI instructions
+3. Router is now optional (useful for validation/testing)
